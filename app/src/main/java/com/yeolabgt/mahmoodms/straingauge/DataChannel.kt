@@ -1,5 +1,6 @@
 package com.yeolabgt.mahmoodms.straingauge
 
+import android.util.Log
 import com.google.common.primitives.Bytes
 
 /**
@@ -37,10 +38,10 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
         } else {
             this.dataBuffer = newDataPacket
         }
-        for (i in 0 until newDataPacket.size / 2) {
-            addToBuffer(bytesToDouble14bit(newDataPacket[2 * i + 1], newDataPacket[2 * i]))
+        for (i in 0 until newDataPacket.size / 3) {
+            addToBuffer(bytesToDouble(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2]))
         }
-        this.totalDataPointsReceived += newDataPacket.size / 2
+        this.totalDataPointsReceived += newDataPacket.size / 3
         this.packetCounter++
     }
 
@@ -59,6 +60,8 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
     }
 
     companion object {
+        private val TAG = DataChannel::class.java.simpleName
+
         private var MSBFirst: Boolean = false
 
         fun bytesToDoubleMPUAccel(a1: Byte, a2: Byte): Double {
@@ -86,14 +89,9 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
             return unsignedToSigned16bit(unsigned).toDouble() / 32767.0 * 2.25 //2^16/2
         }
 
-        fun bytesToDouble14bit(a1: Byte, a2: Byte): Double {
-            val unsigned = unsignedBytesToInt(a1, a2, MSBFirst)
-            return unsignedToSigned16bit(unsigned).toDouble() / 16384.0 * 3.30
-        }
-
         fun bytesToDouble(a1: Byte, a2: Byte, a3: Byte): Double {
             val unsigned = unsignedBytesToInt(a1, a2, a3, MSBFirst)
-            return unsignedToSigned24bit(unsigned).toDouble() / 8388607.0 * 2.25
+            return unsignedToSigned24bit(unsigned).toDouble() / 8388607.0 * 2.048
         }
 
         private fun unsignedToSigned16bit(unsigned: Int): Int {

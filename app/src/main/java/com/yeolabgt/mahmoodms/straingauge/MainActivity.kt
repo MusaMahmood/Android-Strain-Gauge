@@ -223,7 +223,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        private val TAG = DeviceControlActivity::class.java.simpleName
+        private val TAG = MainActivity::class.java.simpleName
         private val MULTIPLE_PERMISSIONS_REQUEST = 139
         private val SCAN_PERIOD: Long = 10000
         private val REQUEST_ENABLE_BT = 12

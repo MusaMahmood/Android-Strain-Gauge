@@ -44,11 +44,11 @@ internal class ScannedDeviceAdapter//Constructor
         for (device in list) {
             if (newDevice.address.equals(device.device!!.address, ignoreCase = true)) {
                 contains = true
-                device.rssi = rssi//update
+                device.rssi = rssi
                 break
             }
         }
-        Log.d(TAG, "update: ScanRecord," + scanRecord.toString())
+        Log.d(TAG, "update: ScanRecord,$scanRecord")
         if (!contains) {
             list.add(ScannedDevice(newDevice, rssi))
         }

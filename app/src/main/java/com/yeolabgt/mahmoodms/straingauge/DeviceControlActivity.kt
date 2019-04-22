@@ -43,10 +43,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     // Graphing Variables:
     private var mGraphInitializedBoolean = false
     private var mGraphAdapterCh1: GraphAdapter? = null
-    private var mGraphAdapterCh2: GraphAdapter? = null
-    private var mGraphAdapterMotionAX: GraphAdapter? = null
-    private var mGraphAdapterMotionAY: GraphAdapter? = null
-    private var mGraphAdapterMotionAZ: GraphAdapter? = null
     private var mTimeDomainPlotAdapterCh1: XYPlotAdapter? = null
     private var mMotionDataPlotAdapter: XYPlotAdapter? = null
     //Device Information
@@ -59,7 +55,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     private var mMSBFirst = false
     //Connecting to Multiple Devices
     private var deviceMacAddresses: Array<String>? = null
-    private var mEEGConnectedAllChannels = false
     //UI Elements - TextViews, Buttons, etc
     private var mBatteryLevel: TextView? = null
     private var mDataRate: TextView? = null
@@ -117,9 +112,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         mChannelSelect = findViewById(R.id.toggleButtonGraph)
         mChannelSelect!!.setOnCheckedChangeListener { _, b ->
             mGraphAdapterCh1!!.clearPlot()
-            mGraphAdapterCh2!!.clearPlot()
             mGraphAdapterCh1!!.plotData = b
-            mGraphAdapterCh2!!.plotData = b
         }
         mExportButton.setOnClickListener { exportData() }
     }
@@ -135,7 +128,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         val context = applicationContext
         val uii = FileProvider.getUriForFile(context, context.packageName + ".provider", mPrimarySaveDataFile!!.file)
         files.add(uii)
-        if(mSaveFileMPU!=null) {
+        if (mSaveFileMPU != null) {
             val uii2 = FileProvider.getUriForFile(context, context.packageName + ".provider", mSaveFileMPU!!.file)
             files.add(uii2)
         }
@@ -178,7 +171,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             Toast.makeText(this, "No Devices Queued, Restart!", Toast.LENGTH_SHORT).show()
         }
         mActBle = ActBle(this, mBluetoothManager, this)
-        mBluetoothGattArray = Array(deviceMacAddresses!!.size, { i -> mActBle!!.connect(mBluetoothDeviceArray[i]) })
+        mBluetoothGattArray = Array(deviceMacAddresses!!.size) { i -> mActBle!!.connect(mBluetoothDeviceArray[i]) }
         for (i in mBluetoothDeviceArray.indices) {
             Log.e(TAG, "Connecting to Device: " + (mBluetoothDeviceArray[i]!!.name + " " + mBluetoothDeviceArray[i]!!.address))
             if ("EMG 250Hz" == mBluetoothDeviceArray[i]!!.name) {
@@ -206,7 +199,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     mSampleRate = 500
                 }
                 else -> {
-                    mSampleRate = 250
+                    mSampleRate = 20
                 }
             }
             Log.e(TAG, "mSampleRate: " + mSampleRate + "Hz")
@@ -217,67 +210,34 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     private fun createNewFile() {
-        val directory = "/ECGData"
-        val fileNameTimeStamped = "ECGData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
+        val directory = "/StrainGaugeData"
+        val fileNameTimeStamped = "StrainGaugeData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
         if (mPrimarySaveDataFile == null) {
-            Log.e(TAG, "fileTimeStamp: " + fileNameTimeStamped)
+            Log.e(TAG, "fileTimeStamp: $fileNameTimeStamped")
             mPrimarySaveDataFile = SaveDataFile(directory, fileNameTimeStamped,
-                    16, 1.toDouble() / mSampleRate, true, false)
+                    24, 1.toDouble() / mSampleRate, saveTimestamps = true, includeClass = false)
         } else if (!mPrimarySaveDataFile!!.initialized) {
-            Log.e(TAG, "New Filename: " + fileNameTimeStamped)
+            Log.e(TAG, "New Filename: $fileNameTimeStamped")
             mPrimarySaveDataFile?.createNewFile(directory, fileNameTimeStamped)
-        }
-    }
-
-    private fun createNewFileMPU() {
-        val directory = "/MPUData"
-        val fileNameTimeStamped = "MPUData_" + mTimeStamp
-        if (mSaveFileMPU == null) {
-            Log.e(TAG, "fileTimeStamp: " + fileNameTimeStamped)
-            mSaveFileMPU = SaveDataFile(directory, fileNameTimeStamped,
-                    16, 0.032, true, false)
-        } else if (!mSaveFileMPU!!.initialized) {
-            Log.e(TAG, "New Filename: " + fileNameTimeStamped)
-            mSaveFileMPU?.createNewFile(directory, fileNameTimeStamped)
         }
     }
 
     private fun setupGraph() {
         // Initialize our XYPlot reference:
-        mGraphAdapterCh1 = GraphAdapter(1250, "ECG Data Ch 1", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
-        mGraphAdapterCh2 = GraphAdapter(1250, "ECG Data Ch 2", false, Color.RED) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
-        mGraphAdapterMotionAX = GraphAdapter(375, "Acc X", false, Color.RED)
-        mGraphAdapterMotionAY = GraphAdapter(375, "Acc Y", false, Color.GREEN)
-        mGraphAdapterMotionAZ = GraphAdapter(375, "Acc Z", false, Color.BLUE)
+        mGraphAdapterCh1 = GraphAdapter(120, "GSR/SG", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
         //PLOT CH1 By default
-        mGraphAdapterCh1!!.setPointWidth(2.toFloat())
-        mGraphAdapterCh2!!.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAX?.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAY?.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAZ?.setPointWidth(2.toFloat())
-        mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, if (mSampleRate < 1000) 4 * mSampleRate else 2000)
+        mGraphAdapterCh1!!.setPointWidth(5.toFloat())
+        mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, 120, sampleRate = 4)
         mTimeDomainPlotAdapterCh1?.xyPlot?.addSeries(mGraphAdapterCh1!!.series, mGraphAdapterCh1!!.lineAndPointFormatter)
         mMotionDataPlotAdapter = XYPlotAdapter(findViewById(R.id.motionDataPlot), "Time (s)", "Acc (g)", 375.0)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAX?.series, mGraphAdapterMotionAX?.lineAndPointFormatter)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAY?.series, mGraphAdapterMotionAY?.lineAndPointFormatter)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAZ?.series, mGraphAdapterMotionAZ?.lineAndPointFormatter)
         val xyPlotList = listOf(mTimeDomainPlotAdapterCh1?.xyPlot, mMotionDataPlotAdapter?.xyPlot)
         mRedrawer = Redrawer(xyPlotList, 30f, false)
         mRedrawer!!.start()
         mGraphInitializedBoolean = true
 
-        mGraphAdapterMotionAX?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAX?.setSeriesHistoryDataPoints(375)
-        mGraphAdapterMotionAY?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAY?.setSeriesHistoryDataPoints(375)
-        mGraphAdapterMotionAZ?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAZ?.setSeriesHistoryDataPoints(375)
-
         mGraphAdapterCh1!!.setxAxisIncrementFromSampleRate(mSampleRate)
-        mGraphAdapterCh2!!.setxAxisIncrementFromSampleRate(mSampleRate)
 
-        mGraphAdapterCh1!!.setSeriesHistoryDataPoints(1250)
-        mGraphAdapterCh2!!.setSeriesHistoryDataPoints(1250)
+        mGraphAdapterCh1!!.setSeriesHistoryDataPoints(20 * 30)
     }
 
     private fun setNameAddress(name_action: String?, address_action: String?) {
@@ -392,7 +352,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             mTimeDomainPlotAdapterCh1!!.xyPlot?.redraw()
             mChannelSelect!!.isChecked = chSel
             mGraphAdapterCh1!!.plotData = chSel
-            mGraphAdapterCh2!!.plotData = chSel
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -456,8 +415,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_MPU_COMBINED), true)
                     //TODO: INITIALIZE MPU FILE HERE:
                     mMPU = DataChannel(false, true, 0)
-//                    mSaveFileMPU = null
-                    createNewFileMPU()
                 }
             }
             //Run process only once:
@@ -472,18 +429,18 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                 if (characteristic.value != null) {
                     val batteryLevel = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 0)
                     updateBatteryStatus(batteryLevel)
-                    Log.i(TAG, "Battery Level :: " + batteryLevel)
+                    Log.i(TAG, "Battery Level :: $batteryLevel")
                 }
             }
         } else {
-            Log.e(TAG, "onCharacteristic Read Error" + status)
+            Log.e(TAG, "onCharacteristic Read Error$status")
         }
     }
 
     override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
         if (mCh1 == null || mCh2 == null) {
-            mCh1 = DataChannel(false, mMSBFirst, 4 * mSampleRate)
-            mCh2 = DataChannel(false, mMSBFirst, 4 * mSampleRate)
+            mCh1 = DataChannel(false, mMSBFirst, 4 * 250)
+            mCh2 = DataChannel(false, mMSBFirst, 4 * 250)
         }
 
         if (AppConstant.CHAR_BATTERY_LEVEL == characteristic.uuid) {
@@ -499,66 +456,21 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             addToGraphBuffer(mCh1!!, mGraphAdapterCh1)
             mPrimarySaveDataFile!!.writeToDisk(mCh1!!.characteristicDataPacketBytes)
         }
-
-//        if (AppConstant.CHAR_EEG_CH1_SIGNAL == characteristic.uuid) {
-//            if (!mCh1!!.chEnabled) mCh1!!.chEnabled = true
-//            val mNewEEGdataBytes = characteristic.value
-//            getDataRateBytes(mNewEEGdataBytes.size)
-//            mCh1!!.handleNewData(mNewEEGdataBytes)
-//            addToGraphBuffer(mCh1!!, mGraphAdapterCh1)
-//            mPrimarySaveDataFile!!.writeToDisk(mCh1!!.characteristicDataPacketBytes)
-//        }
-
-        /*if (AppConstant.CHAR_MPU_COMBINED == characteristic.uuid) {
-            val dataMPU = characteristic.value
-            getDataRateBytes2(dataMPU.size) //+=240
-            mMPU!!.handleNewData(dataMPU)
-            addToGraphBufferMPU(mMPU!!)
-            mSaveFileMPU!!.exportDataWithTimestampMPU(mMPU!!.characteristicDataPacketBytes)
-            if (mSaveFileMPU!!.mLinesWrittenCurrentFile > 1048576) {
-                mSaveFileMPU!!.terminateDataFileWriter()
-                createNewFileMPU()
-            }
-        }*/
     }
 
     private fun addToGraphBuffer(dataChannel: DataChannel, graphAdapter: GraphAdapter?) {
-        if (mFilterData && dataChannel.totalDataPointsReceived > 4* mSampleRate/* && mSampleRate < 1000*/) {
-            val bufferLength = 4 * 250
-            //TODO: Downsample, then filter, then plot:
-            val filterArray = jdownSample(dataChannel.classificationBuffer, mSampleRate)
-            graphAdapter?.setSeriesHistoryDataPoints(bufferLength)
-            val filteredData = jecgBandStopFilter(filterArray)
-            graphAdapter!!.clearPlot()
-
-            for (i in filteredData.indices) { // gA.addDataPointTimeDomain(y,x)
-                graphAdapter.addDataPointTimeDomainAlt(filteredData[i], dataChannel.totalDataPointsReceived - (bufferLength - 1) + i)
-            }
-        } else {
-            if (dataChannel.dataBuffer != null) {
-                var i = 0
-                while (i < dataChannel.dataBuffer!!.size / 2) {
-                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble14bit(dataChannel.dataBuffer!![2 * i  + 1],
-                            dataChannel.dataBuffer!![2 * i]),
-                            dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / 2 + i)
-                    i += graphAdapter.sampleRate / 250
-                }
+        if (dataChannel.dataBuffer != null) {
+            val numberBytes = 3
+            var i = 0
+            while (i < dataChannel.dataBuffer!!.size / numberBytes) {
+                graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble(dataChannel.dataBuffer!![numberBytes * i],
+                        dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
+                        dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                i += graphAdapter.sampleRate / mSampleRate
             }
         }
         dataChannel.resetBuffer()
     }
-
-//    private fun addToGraphBufferMPU(dataChannel: DataChannel) {
-//        if (dataChannel.dataBuffer!=null) {
-//            for (i in 0 until dataChannel.dataBuffer!!.size / 12) {
-//                mGraphAdapterMotionAX?.addDataPointTimeDomain(DataChannel.bytesToDoubleMPUAccel(dataChannel.dataBuffer!![12 * i], dataChannel.dataBuffer!![12 * i + 1]), mTimestampIdxMPU)
-//                mGraphAdapterMotionAY?.addDataPointTimeDomain(DataChannel.bytesToDoubleMPUAccel(dataChannel.dataBuffer!![12 * i + 2], dataChannel.dataBuffer!![12 * i + 3]), mTimestampIdxMPU)
-//                mGraphAdapterMotionAZ?.addDataPointTimeDomain(DataChannel.bytesToDoubleMPUAccel(dataChannel.dataBuffer!![12 * i + 4], dataChannel.dataBuffer!![12 * i + 5]), mTimestampIdxMPU)
-//                mTimestampIdxMPU += 1
-//            }
-//        }
-//        dataChannel.resetBuffer()
-//    }
 
     private fun getDataRateBytes(bytes: Int) {
         val mCurrentTime = System.currentTimeMillis()
@@ -567,22 +479,11 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             dataRate = (points / 5).toDouble()
             points = 0
             mLastTime = mCurrentTime
-            Log.e(" DataRate:", dataRate.toString() + " Bytes/s")
+            Log.e(" DataRate:", "$dataRate Bytes/s")
             runOnUiThread {
-                val s = dataRate.toString() + " Bytes/s"
+                val s = "$dataRate Bytes/s"
                 mDataRate!!.text = s
             }
-        }
-    }
-
-    private fun getDataRateBytes2(bytes: Int) {
-        val mCurrentTime = System.currentTimeMillis()
-        points2 += bytes
-        if (mCurrentTime > mLastTime2 + 3000) {
-            val datarate2 = (points2 / 3).toDouble()
-            points2 = 0
-            mLastTime2 = mCurrentTime
-            Log.e(" DataRate 2(MPU):", datarate2.toString() + " Bytes/s")
         }
     }
 
@@ -667,17 +568,17 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-        Log.i(TAG, "onCharacteristicWrite :: Status:: " + status)
+        Log.i(TAG, "onCharacteristicWrite :: Status:: $status")
     }
 
     override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {}
 
     override fun onDescriptorRead(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-        Log.i(TAG, "onDescriptorRead :: Status:: " + status)
+        Log.i(TAG, "onDescriptorRead :: Status:: $status")
     }
 
     override fun onError(errorMessage: String) {
-        Log.e(TAG, "Error:: " + errorMessage)
+        Log.e(TAG, "Error:: $errorMessage")
     }
 
     private fun updateConnectionState(status: String) {
@@ -700,14 +601,14 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             125.0 / 3.0 * convertedBatteryVoltage - 75.0 < 0.0 -> 0.0
             else -> 125.0 / 3.0 * convertedBatteryVoltage - 75.0
         }
-        Log.e(TAG, "Battery Integer Value: " + integerValue.toString())
+        Log.e(TAG, "Battery Integer Value: $integerValue")
         Log.e(TAG, "ConvertedBatteryVoltage: " + String.format(Locale.US, "%.5f", convertedBatteryVoltage) + "V : " + String.format(Locale.US, "%.3f", finalPercent) + "%")
         status = String.format(Locale.US, "%.1f", finalPercent) + "%"
         runOnUiThread {
             if (finalPercent <= batteryWarning) {
                 mBatteryLevel!!.setTextColor(Color.RED)
                 mBatteryLevel!!.setTypeface(null, Typeface.BOLD)
-                Toast.makeText(applicationContext, "Charge Battery, Battery Low " + status, Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Charge Battery, Battery Low $status", Toast.LENGTH_SHORT).show()
             } else {
                 mBatteryLevel!!.setTextColor(Color.GREEN)
                 mBatteryLevel!!.setTypeface(null, Typeface.BOLD)
@@ -720,7 +621,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         runOnUiThread {
             val menuItem = menu!!.findItem(R.id.action_rssi)
             val statusActionItem = menu!!.findItem(R.id.action_status)
-            val valueOfRSSI = rssi.toString() + " dB"
+            val valueOfRSSI = "$rssi dB"
             menuItem.title = valueOfRSSI
             if (mConnected) {
                 val newStatus = "Status: " + getString(R.string.connected)
@@ -732,15 +633,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         }
     }
 
-//    private external fun jSSVEPCfilter(data: DoubleArray): FloatArray
-
-    private external fun jdownSample(data: DoubleArray, sampleRate: Int): DoubleArray
-
-    private external fun jecgBandStopFilter(data: DoubleArray): DoubleArray
-
     private external fun jmainInitialization(initialize: Boolean): Int
-
-//    private external fun jecgVarFilter(data_array: DoubleArray, sampleRate: Double, windowLength: Double): FloatArray
 
     companion object {
         val HZ = "0 Hz"
@@ -753,7 +646,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         internal var mCh2: DataChannel? = null
         internal var mMPU: DataChannel? = null
         internal var mFilterData = false
-        private var mTimestampIdxMPU = 0
         //RSSI:
         private val RSSI_UPDATE_TIME_INTERVAL = 2000
         var mSSVEPClass = 0.0

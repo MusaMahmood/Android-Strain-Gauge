@@ -124,10 +124,18 @@ constructor(directory: String, fileName: String, byteResolution: Int, increment:
         val len = byteArrays.size // Number of channels
         val doubles = if (this.resolutionBits==16)
             Array(len){DoubleArray(byteArrays[0]!!.size/2)}
-            else Array(len) {DoubleArray(byteArrays[0]!!.size/3)}
+        else Array(len) {DoubleArray(byteArrays[0]!!.size/3)}
         for (ch in 0 until len) { // each channel
-            for (dp in 0 until byteArrays[ch]!!.size / 2) { // each datapoint
-                doubles[ch][dp] = DataChannel.bytesToDouble14bit(byteArrays[ch]!![2*dp + 1], byteArrays[ch]!![2 * dp])
+            if (this.resolutionBits == 16) {
+                for (dp in 0 until byteArrays[ch]!!.size / 2) { // each datapoint
+                    doubles[ch][dp] = DataChannel.bytesToDouble(byteArrays[ch]!![2*dp],
+                            byteArrays[ch]!![2 * dp + 1])
+                }
+            } else if (this.resolutionBits == 24) {
+                for (dp in 0 until byteArrays[ch]!!.size / 3) {
+                    doubles[ch][dp] = DataChannel.bytesToDouble(byteArrays[ch]!![3 * dp],
+                            byteArrays[ch]!![3 * dp + 1], byteArrays[ch]!![3 * dp + 2])
+                }
             }
         }
         try {
@@ -135,7 +143,6 @@ constructor(directory: String, fileName: String, byteResolution: Int, increment:
         } catch (e: IOException) {
             Log.e("IOException", e.toString())
         }
-
     }
 
     @Throws(IOException::class)
