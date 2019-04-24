@@ -29,6 +29,7 @@ import android.widget.ToggleButton
 
 import com.androidplot.util.Redrawer
 import com.yeolabgt.mahmoodms.actblelibrary.ActBle
+import org.tensorflow.DataType
 
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -43,6 +44,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     // Graphing Variables:
     private var mGraphInitializedBoolean = false
     private var mGraphAdapterCh1: GraphAdapter? = null
+    private var mGraphAdapterCh2: GraphAdapter? = null
     private var mTimeDomainPlotAdapterCh1: XYPlotAdapter? = null
     private var mMotionDataPlotAdapter: XYPlotAdapter? = null
     //Device Information
@@ -113,6 +115,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         mChannelSelect!!.setOnCheckedChangeListener { _, b ->
             mGraphAdapterCh1!!.clearPlot()
             mGraphAdapterCh1!!.plotData = b
+            mGraphAdapterCh2!!.clearPlot()
+            mGraphAdapterCh2!!.plotData = b
         }
         mExportButton.setOnClickListener { exportData() }
     }
@@ -225,19 +229,24 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     private fun setupGraph() {
         // Initialize our XYPlot reference:
         mGraphAdapterCh1 = GraphAdapter(120, "GSR/SG", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
+        mGraphAdapterCh2 = GraphAdapter(120, "Temperature", false, Color.GREEN) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
         //PLOT CH1 By default
         mGraphAdapterCh1!!.setPointWidth(5.toFloat())
+        mGraphAdapterCh2!!.setPointWidth(5.toFloat())
         mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, 120, sampleRate = 4)
-        mTimeDomainPlotAdapterCh1?.xyPlot?.addSeries(mGraphAdapterCh1!!.series, mGraphAdapterCh1!!.lineAndPointFormatter)
         mMotionDataPlotAdapter = XYPlotAdapter(findViewById(R.id.motionDataPlot), "Time (s)", "Acc (g)", 375.0)
+        mTimeDomainPlotAdapterCh1?.xyPlot?.addSeries(mGraphAdapterCh1!!.series, mGraphAdapterCh1!!.lineAndPointFormatter)
+        mMotionDataPlotAdapter?.xyPlot?.addSeries(mGraphAdapterCh2!!.series, mGraphAdapterCh2!!.lineAndPointFormatter)
         val xyPlotList = listOf(mTimeDomainPlotAdapterCh1?.xyPlot, mMotionDataPlotAdapter?.xyPlot)
         mRedrawer = Redrawer(xyPlotList, 30f, false)
         mRedrawer!!.start()
         mGraphInitializedBoolean = true
 
         mGraphAdapterCh1!!.setxAxisIncrementFromSampleRate(mSampleRate)
+        mGraphAdapterCh2!!.setxAxisIncrementFromSampleRate(mSampleRate)
 
         mGraphAdapterCh1!!.setSeriesHistoryDataPoints(20 * 30)
+        mGraphAdapterCh2!!.setSeriesHistoryDataPoints(20 * 30)
     }
 
     private fun setNameAddress(name_action: String?, address_action: String?) {
@@ -401,8 +410,11 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                 }
 
                 if (AppConstant.SERVICE_STRAIN_GAUGE == service.uuid) {
-                    if (service.getCharacteristic(AppConstant.CHAR_STRAIN_GAUGE) != null) {
-                        mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_STRAIN_GAUGE), true)
+                    if (service.getCharacteristic(AppConstant.CHAR_GSR_SIGNAL) != null) {
+                        mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_GSR_SIGNAL), true)
+                    }
+                    if (service.getCharacteristic(AppConstant.CHAR_TEMP_DATA) != null) {
+                        mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_TEMP_DATA), true)
                     }
                 }
 
@@ -448,7 +460,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             updateBatteryStatus(batteryLevel)
         }
 
-        if (AppConstant.CHAR_STRAIN_GAUGE == characteristic.uuid) {
+        if (AppConstant.CHAR_GSR_SIGNAL == characteristic.uuid) {
             if (!mCh1!!.chEnabled) mCh1!!.chEnabled = true
             val data = characteristic.value
             getDataRateBytes(data.size)
@@ -456,16 +468,30 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             addToGraphBuffer(mCh1!!, mGraphAdapterCh1)
             mPrimarySaveDataFile!!.writeToDisk(mCh1!!.characteristicDataPacketBytes)
         }
+
+        if (AppConstant.CHAR_TEMP_DATA == characteristic.uuid) {
+            if (!mCh2!!.chEnabled) mCh2!!.chEnabled = true
+            val data = characteristic.value
+            getDataRateBytes(data.size)
+            mCh2!!.handleNewData(data, dataType = 2)
+            addToGraphBuffer(mCh2!!, mGraphAdapterCh2, dataType = 2)
+        }
     }
 
-    private fun addToGraphBuffer(dataChannel: DataChannel, graphAdapter: GraphAdapter?) {
+    private fun addToGraphBuffer(dataChannel: DataChannel, graphAdapter: GraphAdapter?, dataType: Int = 1) {
         if (dataChannel.dataBuffer != null) {
             val numberBytes = 3
             var i = 0
             while (i < dataChannel.dataBuffer!!.size / numberBytes) {
-                graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble(dataChannel.dataBuffer!![numberBytes * i],
-                        dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
-                        dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                if (dataType == 1) {
+                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble(dataChannel.dataBuffer!![numberBytes * i],
+                            dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
+                            dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                } else {
+                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDoubleADS1220TempSensor(dataChannel.dataBuffer!![numberBytes * i],
+                            dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
+                            dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                }
                 i += graphAdapter.sampleRate / mSampleRate
             }
         }

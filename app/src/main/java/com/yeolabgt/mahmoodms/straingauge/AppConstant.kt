@@ -15,7 +15,8 @@ class AppConstant {
          */
         internal val SERVICE_STRAIN_GAUGE = UUID.fromString("228ba730-35fd-875f-39fe-b2a394d28057")
         // Char:
-        internal val CHAR_STRAIN_GAUGE = UUID.fromString("0000a731-0000-1000-8000-00805f9b34fb")
+        internal val CHAR_GSR_SIGNAL = UUID.fromString("0000a731-0000-1000-8000-00805f9b34fb")
+        internal val CHAR_TEMP_DATA = UUID.fromString("0000a732-0000-1000-8000-00805f9b34fb")
         /**
          * For EEG:
          */

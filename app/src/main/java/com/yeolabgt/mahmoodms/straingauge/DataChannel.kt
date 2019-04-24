@@ -2,6 +2,8 @@ package com.yeolabgt.mahmoodms.straingauge
 
 import android.util.Log
 import com.google.common.primitives.Bytes
+import kotlin.experimental.and
+import kotlin.experimental.or
 
 /**
  * Created by mmahmood31 on 9/19/2017.
@@ -31,7 +33,7 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
      *
      * @param newDataPacket new data packet received via BLE>
      */
-    fun handleNewData(newDataPacket: ByteArray) {
+    fun handleNewData(newDataPacket: ByteArray, dataType: Int=1) {
         this.characteristicDataPacketBytes = newDataPacket
         if (this.dataBuffer != null) {
             this.dataBuffer = Bytes.concat(this.dataBuffer, newDataPacket)
@@ -39,7 +41,11 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
             this.dataBuffer = newDataPacket
         }
         for (i in 0 until newDataPacket.size / 3) {
-            addToBuffer(bytesToDouble(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2]))
+            if (dataType == 1)
+                addToBuffer(bytesToDouble(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2])) // GSR Data
+            else
+                addToBuffer(bytesToDoubleADS1220TempSensor(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2])) // Temp Data
+
         }
         this.totalDataPointsReceived += newDataPacket.size / 3
         this.packetCounter++
@@ -92,6 +98,23 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
         fun bytesToDouble(a1: Byte, a2: Byte, a3: Byte): Double {
             val unsigned = unsignedBytesToInt(a1, a2, a3, MSBFirst)
             return unsignedToSigned24bit(unsigned).toDouble() / 8388607.0 * 2.048
+        }
+
+        fun bytesToDoubleADS1220TempSensor(a1: Byte, a2: Byte, a3: Byte): Double {
+            val negative = (a1 and 0b10000000.toByte()) != 0.toByte()
+            val unsigned = unsignedBytesToInt(a1, a2, a3, MSBFirst)
+            val shifted = unsigned ushr 10 // shifts 24 bits to 14-bits
+            return if (negative)
+                unsignedToSigned14bit(shifted).toDouble() * 0.03125 //°C
+            else
+                shifted.toDouble() * 0.03125
+        }
+
+        private fun unsignedToSigned14bit(unsigned: Int): Int {
+            return if (unsigned and 0b10_0000_0000 != 0)
+                -1 * (0b10_0000_0000 - (unsigned and 0b10_0000_0000 - 1))
+            else
+                unsigned
         }
 
         private fun unsignedToSigned16bit(unsigned: Int): Int {
