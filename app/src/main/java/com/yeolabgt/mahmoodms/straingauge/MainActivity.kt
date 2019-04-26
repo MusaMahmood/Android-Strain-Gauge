@@ -47,8 +47,26 @@ class MainActivity : Activity() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             runOnUiThread {
                 if (!mDeviceAddressesMAC.contains(result.device.address)) {
-                    scannedDeviceAdapter!!.update(result.device, result.rssi, result.scanRecord)
-                    scannedDeviceAdapter!!.notifyDataSetChanged()
+                    // TODO: Detect device name; place in corresponding list using methods under: "Click Item Listener"
+                    if (result.device.name != null && (
+                            result.device.name.toLowerCase() == "gsr_dev1" ||
+                            result.device.name.toLowerCase() == "gsr_dev2")) {
+                        Log.e(TAG, "Detected Device ${result.device.name.toLowerCase()}")
+                        // Add to device list & increment Number
+                        if (!mDeviceAddressesMAC.contains(result.device.address)) {
+                            mDeviceNames.add(result.device.name.toString())
+                            mDeviceAddressesMAC.add(result.device.address)
+                            mDevicesSelectedCount++
+                            selectedDeviceAdapter!!.update(result.device, result.rssi, result.scanRecord)
+                            selectedDeviceAdapter!!.notifyDataSetChanged()
+                        }
+                        if (mDevicesSelectedCount == 2) { //Launch DCA
+                            launchAndConnect()
+                        }
+                    } else {
+                        scannedDeviceAdapter!!.update(result.device, result.rssi, result.scanRecord)
+                        scannedDeviceAdapter!!.notifyDataSetChanged()
+                    }
                 }
             }
             super.onScanResult(callbackType, result)
@@ -113,23 +131,27 @@ class MainActivity : Activity() {
             }
         }
         connectButton.setOnClickListener {
-            if (mDevicesSelectedCount > 0) {
-                if (mScanning) {
-                    if (mBluetoothAdapter!!.isEnabled)
-                        mBluetoothAdapter!!.bluetoothLeScanner.stopScan(mScanCallback)
-                    mScanning = false
-                }
-                //Send intent
-                if (!mDeviceAddressesMAC.isEmpty()) {
-                    val selectedDeviceArray = mDeviceAddressesMAC.toTypedArray()
-                    val selectedDeviceNames = mDeviceNames.toTypedArray()
-                    val intent = Intent(this@MainActivity, DeviceControlActivity::class.java)
-                    intent.putExtra(INTENT_DEVICES_KEY, selectedDeviceArray)
-                    intent.putExtra(INTENT_DEVICES_NAMES, selectedDeviceNames)
-                    startActivity(intent)
-                } else {
-                    Toast.makeText(this@MainActivity, "No Devices Selected!", Toast.LENGTH_SHORT).show()
-                }
+            launchAndConnect()
+        }
+    }
+
+    private fun launchAndConnect() {
+        if (mDevicesSelectedCount > 0) {
+            if (mScanning) {
+                if (mBluetoothAdapter!!.isEnabled)
+                    mBluetoothAdapter!!.bluetoothLeScanner.stopScan(mScanCallback)
+                mScanning = false
+            }
+            //Send intent
+            if (!mDeviceAddressesMAC.isEmpty()) {
+                val selectedDeviceArray = mDeviceAddressesMAC.toTypedArray()
+                val selectedDeviceNames = mDeviceNames.toTypedArray()
+                val intent = Intent(this@MainActivity, DeviceControlActivity::class.java)
+                intent.putExtra(INTENT_DEVICES_KEY, selectedDeviceArray)
+                intent.putExtra(INTENT_DEVICES_NAMES, selectedDeviceNames)
+                startActivity(intent)
+            } else {
+                Toast.makeText(this@MainActivity, "No Devices Selected!", Toast.LENGTH_SHORT).show()
             }
         }
     }
