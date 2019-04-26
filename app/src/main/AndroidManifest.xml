@@ -39,7 +39,8 @@
         <activity android:name="com.yeolabgt.mahmoodms.straingauge.DeviceControlActivity"
             android:hardwareAccelerated="false"
             android:label="ECG Sensor Data"
-            android:parentActivityName="com.yeolabgt.mahmoodms.straingauge.MainActivity">
+            android:parentActivityName="com.yeolabgt.mahmoodms.straingauge.MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.yeolabgt.mahmoodms.straingauge.MainActivity" />

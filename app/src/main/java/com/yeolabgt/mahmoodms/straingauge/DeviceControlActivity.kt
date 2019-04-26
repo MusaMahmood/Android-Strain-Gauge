@@ -1,6 +1,7 @@
 package com.yeolabgt.mahmoodms.straingauge
 
 import android.app.Activity
+import android.app.KeyguardManager
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -259,17 +260,21 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     override fun onDestroy() {
-        mRedrawer?.finish()
-        disconnectAllBLE()
-        try {
-            terminateDataFileWriter()
-        } catch (e: IOException) {
-            Log.e(TAG, "IOException in saveDataFile")
-            e.printStackTrace()
-        }
+        val myKM = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        if (!myKM.inKeyguardRestrictedInputMode()) {
+            //Device is not locked
+            mRedrawer?.finish()
+            disconnectAllBLE()
+            try {
+                terminateDataFileWriter()
+            } catch (e: IOException) {
+                Log.e(TAG, "IOException in saveDataFile")
+                e.printStackTrace()
+            }
 
-        stopMonitoringRssiValue()
-        jmainInitialization(false) //Just a technicality, doesn't actually do anything
+            stopMonitoringRssiValue()
+            jmainInitialization(false) //Just a technicality, doesn't actually do anything
+        }
         super.onDestroy()
     }
 
@@ -323,9 +328,9 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                 return true
             }
             android.R.id.home -> {
-//                if (mActBle != null) {
-//                    disconnectAllBLE()
-//                }
+                if (mActBle != null) {
+                    disconnectAllBLE()
+                }
                 NavUtils.navigateUpFromSameTask(this)
                 onBackPressed()
                 return true
