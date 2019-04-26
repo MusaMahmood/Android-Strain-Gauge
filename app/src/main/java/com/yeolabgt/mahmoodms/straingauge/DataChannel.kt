@@ -40,14 +40,17 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
         } else {
             this.dataBuffer = newDataPacket
         }
-        for (i in 0 until newDataPacket.size / 3) {
-            if (dataType == 1)
+        if (dataType == 1) {
+            for (i in 0 until newDataPacket.size / 3) {
                 addToBuffer(bytesToDouble(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2])) // GSR Data
-            else
-                addToBuffer(bytesToDoubleADS1220TempSensor(newDataPacket[3 * i], newDataPacket[3 * i + 1], newDataPacket[3 * i + 2])) // Temp Data
-
+            }
+            this.totalDataPointsReceived += newDataPacket.size / 3
+        } else if (dataType == 2){
+            for (i in 0 until newDataPacket.size / 2) {
+                addToBuffer(bytesToDoubleTMP116(newDataPacket[2 * i], newDataPacket[2 * i + 1])) // Temp Data
+            }
+            this.totalDataPointsReceived += newDataPacket.size / 2
         }
-        this.totalDataPointsReceived += newDataPacket.size / 3
         this.packetCounter++
     }
 
@@ -93,6 +96,11 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
         fun bytesToDouble(a1: Byte, a2: Byte): Double {
             val unsigned = unsignedBytesToInt(a1, a2, MSBFirst)
             return unsignedToSigned16bit(unsigned).toDouble() / 32767.0 * 2.25 //2^16/2
+        }
+
+        fun bytesToDoubleTMP116(a1: Byte, a2: Byte, MSBFirst:Boolean = false): Double {
+            val unsigned = unsignedBytesToInt(a1, a2, MSBFirst)
+            return unsignedToSigned16bit(unsigned).toDouble() / 32767.0 * 256.0 //2^16/2
         }
 
         fun bytesToDouble(a1: Byte, a2: Byte, a3: Byte): Double {

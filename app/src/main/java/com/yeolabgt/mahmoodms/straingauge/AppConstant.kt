@@ -17,6 +17,8 @@ class AppConstant {
         // Char:
         internal val CHAR_GSR_SIGNAL = UUID.fromString("0000a731-0000-1000-8000-00805f9b34fb")
         internal val CHAR_TEMP_DATA = UUID.fromString("0000a732-0000-1000-8000-00805f9b34fb")
+        internal val CHAR_GSR_SIGNAL_2 = UUID.fromString("0000a733-0000-1000-8000-00805f9b34fb")
+        internal val CHAR_TEMP_DATA_2 = UUID.fromString("0000a734-0000-1000-8000-00805f9b34fb")
         /**
          * For EEG:
          */

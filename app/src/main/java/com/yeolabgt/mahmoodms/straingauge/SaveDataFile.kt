@@ -79,6 +79,32 @@ constructor(directory: String, fileName: String, byteResolution: Int, increment:
         }
     }
 
+    fun writeToDiskSpecial(vararg byteArrays: ByteArray?) {
+        // Convert each array into a double array:
+        val doubles = Array(4) {DoubleArray(byteArrays[0]!!.size/3)} // each packet should have exactly 20 dp
+        for (ch in 0 until 4) {
+            if (ch == 0 || ch == 2) {
+                // 24-bit data from ADS1220
+                for (dp in 0 until byteArrays[ch]!!.size / 3) {
+                    doubles[ch][dp] = DataChannel.bytesToDouble(byteArrays[ch]!![3 * dp],
+                            byteArrays[ch]!![3 * dp + 1], byteArrays[ch]!![3 * dp + 2])
+                }
+            }
+            if (ch == 1 || ch == 3) {
+                // 16-bit data from TMP
+                for (dp in 0 until byteArrays[ch]!!.size / 2) { // each datapoint
+                    doubles[ch][dp] = DataChannel.bytesToDoubleTMP116(byteArrays[ch]!![2*dp],
+                            byteArrays[ch]!![2 * dp + 1])
+                }
+            }
+        }
+        try {
+            exportFile(*doubles)
+        } catch (e: IOException) {
+            Log.e("IOException", e.toString())
+        }
+    }
+
     /**
      *
      * @param bytes split into 6 colns:

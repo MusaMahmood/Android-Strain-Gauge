@@ -29,7 +29,6 @@ import android.widget.ToggleButton
 
 import com.androidplot.util.Redrawer
 import com.yeolabgt.mahmoodms.actblelibrary.ActBle
-import org.tensorflow.DataType
 
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -61,6 +60,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     private var mBatteryLevel: TextView? = null
     private var mDataRate: TextView? = null
     private var mChannelSelect: ToggleButton? = null
+    private var mSelectedDevice = true
     private var menu: Menu? = null
     //Data throughput counter
     private var mLastTime: Long = 0
@@ -72,7 +72,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     //Data Variables:
     private val batteryWarning = 20//
     private var dataRate: Double = 0.toDouble()
-    //Play Sound:
+
+    private var mNumberPackets = -1
 
     private val mTimeStamp: String
         get() = SimpleDateFormat("yyyy.MM.dd_HH.mm.ss", Locale.US).format(Date())
@@ -114,9 +115,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         mChannelSelect = findViewById(R.id.toggleButtonGraph)
         mChannelSelect!!.setOnCheckedChangeListener { _, b ->
             mGraphAdapterCh1!!.clearPlot()
-            mGraphAdapterCh1!!.plotData = b
             mGraphAdapterCh2!!.clearPlot()
-            mGraphAdapterCh2!!.plotData = b
+            mSelectedDevice = b
         }
         mExportButton.setOnClickListener { exportData() }
     }
@@ -203,7 +203,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     mSampleRate = 500
                 }
                 else -> {
-                    mSampleRate = 20
+                    mSampleRate = 5
+                    mMSBFirst = true
                 }
             }
             Log.e(TAG, "mSampleRate: " + mSampleRate + "Hz")
@@ -214,8 +215,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     private fun createNewFile() {
-        val directory = "/StrainGaugeData"
-        val fileNameTimeStamped = "StrainGaugeData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
+        val directory = "/GSRData"
+        val fileNameTimeStamped = "GSRData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
         if (mPrimarySaveDataFile == null) {
             Log.e(TAG, "fileTimeStamp: $fileNameTimeStamped")
             mPrimarySaveDataFile = SaveDataFile(directory, fileNameTimeStamped,
@@ -322,9 +323,9 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                 return true
             }
             android.R.id.home -> {
-                if (mActBle != null) {
-                    disconnectAllBLE()
-                }
+//                if (mActBle != null) {
+//                    disconnectAllBLE()
+//                }
                 NavUtils.navigateUpFromSameTask(this)
                 onBackPressed()
                 return true
@@ -416,6 +417,12 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     if (service.getCharacteristic(AppConstant.CHAR_TEMP_DATA) != null) {
                         mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_TEMP_DATA), true)
                     }
+                    if (service.getCharacteristic(AppConstant.CHAR_GSR_SIGNAL_2) != null) {
+                        mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_GSR_SIGNAL_2), true)
+                    }
+                    if (service.getCharacteristic(AppConstant.CHAR_TEMP_DATA_2) != null) {
+                        mActBle!!.setCharacteristicNotifications(gatt, service.getCharacteristic(AppConstant.CHAR_TEMP_DATA_2), true)
+                    }
                 }
 
                 if (AppConstant.SERVICE_BATTERY_LEVEL == service.uuid) { //Read the device battery percentage
@@ -450,9 +457,11 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-        if (mCh1 == null || mCh2 == null) {
+        if (mCh1 == null || mCh2 == null || mCh3 == null || mCh4 == null) {
             mCh1 = DataChannel(false, mMSBFirst, 4 * 250)
             mCh2 = DataChannel(false, mMSBFirst, 4 * 250)
+            mCh3 = DataChannel(false, mMSBFirst, 4 * 250)
+            mCh4 = DataChannel(false, mMSBFirst, 4 * 250)
         }
 
         if (AppConstant.CHAR_BATTERY_LEVEL == characteristic.uuid) {
@@ -465,8 +474,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             val data = characteristic.value
             getDataRateBytes(data.size)
             mCh1!!.handleNewData(data)
-            addToGraphBuffer(mCh1!!, mGraphAdapterCh1)
-            mPrimarySaveDataFile!!.writeToDisk(mCh1!!.characteristicDataPacketBytes)
+            if (mSelectedDevice) addToGraphBuffer(mCh1!!, mGraphAdapterCh1)
         }
 
         if (AppConstant.CHAR_TEMP_DATA == characteristic.uuid) {
@@ -474,25 +482,53 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             val data = characteristic.value
             getDataRateBytes(data.size)
             mCh2!!.handleNewData(data, dataType = 2)
-            addToGraphBuffer(mCh2!!, mGraphAdapterCh2, dataType = 2)
+            if (mSelectedDevice) addToGraphBuffer(mCh2!!, mGraphAdapterCh2, dataType = 2)
+        }
+
+        if (AppConstant.CHAR_GSR_SIGNAL_2 == characteristic.uuid) {
+            if (!mCh3!!.chEnabled) mCh3!!.chEnabled = true
+            val data = characteristic.value
+            getDataRateBytes(data.size)
+            mCh3!!.handleNewData(data)
+            if (!mSelectedDevice) addToGraphBuffer(mCh3!!, mGraphAdapterCh1)
+        }
+
+        if (AppConstant.CHAR_TEMP_DATA_2 == characteristic.uuid) {
+            if (!mCh4!!.chEnabled) mCh4!!.chEnabled = true
+            val data = characteristic.value
+            getDataRateBytes(data.size)
+            mCh4!!.handleNewData(data, dataType = 2)
+            if (!mSelectedDevice) addToGraphBuffer(mCh4!!, mGraphAdapterCh2, dataType = 2)
+        }
+        if (mCh1!!.chEnabled && mCh2!!.chEnabled && mCh3!!.chEnabled && mCh4!!.chEnabled) {
+            mNumberPackets++
+            mCh1!!.chEnabled = false
+            mCh2!!.chEnabled = false
+            mCh3!!.chEnabled = false
+            mCh4!!.chEnabled = false
+            mPrimarySaveDataFile!!.writeToDiskSpecial(mCh1?.characteristicDataPacketBytes, mCh2?.characteristicDataPacketBytes, mCh3?.characteristicDataPacketBytes, mCh4?.characteristicDataPacketBytes)
         }
     }
 
     private fun addToGraphBuffer(dataChannel: DataChannel, graphAdapter: GraphAdapter?, dataType: Int = 1) {
         if (dataChannel.dataBuffer != null) {
-            val numberBytes = 3
+            val numberBytes: Int
             var i = 0
-            while (i < dataChannel.dataBuffer!!.size / numberBytes) {
-                if (dataType == 1) {
+            if (dataType == 1) {
+                numberBytes = 3
+                while (i < dataChannel.dataBuffer!!.size / numberBytes) {
                     graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble(dataChannel.dataBuffer!![numberBytes * i],
                             dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
                             dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
-                } else {
-                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDoubleADS1220TempSensor(dataChannel.dataBuffer!![numberBytes * i],
-                            dataChannel.dataBuffer!![numberBytes * i + 1], dataChannel.dataBuffer!![numberBytes * i + 2]),
-                            dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                    i += graphAdapter.sampleRate / mSampleRate
                 }
-                i += graphAdapter.sampleRate / mSampleRate
+            } else if (dataType == 2) {
+                numberBytes = 2
+                while (i < dataChannel.dataBuffer!!.size / numberBytes) {
+                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDoubleTMP116(dataChannel.dataBuffer!![numberBytes * i],
+                            dataChannel.dataBuffer!![numberBytes * i + 1]), dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / numberBytes + i)
+                    i += graphAdapter.sampleRate / mSampleRate
+                }
             }
         }
         dataChannel.resetBuffer()
@@ -670,6 +706,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         //Data Channel Classes
         internal var mCh1: DataChannel? = null
         internal var mCh2: DataChannel? = null
+        internal var mCh3: DataChannel? = null
+        internal var mCh4: DataChannel? = null
         internal var mMPU: DataChannel? = null
         internal var mFilterData = false
         //RSSI:
