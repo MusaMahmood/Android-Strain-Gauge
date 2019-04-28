@@ -43,10 +43,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     // Graphing Variables:
     private var mGraphInitializedBoolean = false
     private var mGraphAdapterCh1: GraphAdapter? = null
-    private var mGraphAdapterCh2: GraphAdapter? = null
-    private var mGraphAdapterMotionAX: GraphAdapter? = null
-    private var mGraphAdapterMotionAY: GraphAdapter? = null
-    private var mGraphAdapterMotionAZ: GraphAdapter? = null
     private var mTimeDomainPlotAdapterCh1: XYPlotAdapter? = null
     private var mMotionDataPlotAdapter: XYPlotAdapter? = null
     //Device Information
@@ -117,9 +113,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         mChannelSelect = findViewById(R.id.toggleButtonGraph)
         mChannelSelect!!.setOnCheckedChangeListener { _, b ->
             mGraphAdapterCh1!!.clearPlot()
-            mGraphAdapterCh2!!.clearPlot()
             mGraphAdapterCh1!!.plotData = b
-            mGraphAdapterCh2!!.plotData = b
         }
         mExportButton.setOnClickListener { exportData() }
     }
@@ -206,7 +200,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     mSampleRate = 500
                 }
                 else -> {
-                    mSampleRate = 250
+//                    TODO: Change to 1 or 4 Hz
+                    mSampleRate = 4
                 }
             }
             Log.e(TAG, "mSampleRate: " + mSampleRate + "Hz")
@@ -244,40 +239,20 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
 
     private fun setupGraph() {
         // Initialize our XYPlot reference:
-        mGraphAdapterCh1 = GraphAdapter(1250, "ECG Data Ch 1", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
-        mGraphAdapterCh2 = GraphAdapter(1250, "ECG Data Ch 2", false, Color.RED) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
-        mGraphAdapterMotionAX = GraphAdapter(375, "Acc X", false, Color.RED)
-        mGraphAdapterMotionAY = GraphAdapter(375, "Acc Y", false, Color.GREEN)
-        mGraphAdapterMotionAZ = GraphAdapter(375, "Acc Z", false, Color.BLUE)
+        mGraphAdapterCh1 = GraphAdapter(120, "GSR/SG", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
         //PLOT CH1 By default
-        mGraphAdapterCh1!!.setPointWidth(2.toFloat())
-        mGraphAdapterCh2!!.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAX?.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAY?.setPointWidth(2.toFloat())
-        mGraphAdapterMotionAZ?.setPointWidth(2.toFloat())
-        mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, if (mSampleRate < 1000) 4 * mSampleRate else 2000)
+        mGraphAdapterCh1!!.setPointWidth(5.toFloat())
+        mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, 120, sampleRate = 4)
         mTimeDomainPlotAdapterCh1?.xyPlot?.addSeries(mGraphAdapterCh1!!.series, mGraphAdapterCh1!!.lineAndPointFormatter)
         mMotionDataPlotAdapter = XYPlotAdapter(findViewById(R.id.motionDataPlot), "Time (s)", "Acc (g)", 375.0)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAX?.series, mGraphAdapterMotionAX?.lineAndPointFormatter)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAY?.series, mGraphAdapterMotionAY?.lineAndPointFormatter)
-        mMotionDataPlotAdapter?.xyPlot!!.addSeries(mGraphAdapterMotionAZ?.series, mGraphAdapterMotionAZ?.lineAndPointFormatter)
         val xyPlotList = listOf(mTimeDomainPlotAdapterCh1?.xyPlot, mMotionDataPlotAdapter?.xyPlot)
         mRedrawer = Redrawer(xyPlotList, 30f, false)
         mRedrawer!!.start()
         mGraphInitializedBoolean = true
 
-        mGraphAdapterMotionAX?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAX?.setSeriesHistoryDataPoints(375)
-        mGraphAdapterMotionAY?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAY?.setSeriesHistoryDataPoints(375)
-        mGraphAdapterMotionAZ?.setxAxisIncrement(0.032)
-        mGraphAdapterMotionAZ?.setSeriesHistoryDataPoints(375)
-
         mGraphAdapterCh1!!.setxAxisIncrementFromSampleRate(mSampleRate)
-        mGraphAdapterCh2!!.setxAxisIncrementFromSampleRate(mSampleRate)
 
-        mGraphAdapterCh1!!.setSeriesHistoryDataPoints(1250)
-        mGraphAdapterCh2!!.setSeriesHistoryDataPoints(1250)
+        mGraphAdapterCh1!!.setSeriesHistoryDataPoints(120)
     }
 
     private fun setNameAddress(name_action: String?, address_action: String?) {
@@ -392,7 +367,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
             mTimeDomainPlotAdapterCh1!!.xyPlot?.redraw()
             mChannelSelect!!.isChecked = chSel
             mGraphAdapterCh1!!.plotData = chSel
-            mGraphAdapterCh2!!.plotData = chSel
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -482,8 +456,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
 
     override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
         if (mCh1 == null || mCh2 == null) {
-            mCh1 = DataChannel(false, mMSBFirst, 4 * mSampleRate)
-            mCh2 = DataChannel(false, mMSBFirst, 4 * mSampleRate)
+            mCh1 = DataChannel(false, mMSBFirst, 4 * 250)
+            mCh2 = DataChannel(false, mMSBFirst, 4 * 250)
         }
 
         if (AppConstant.CHAR_BATTERY_LEVEL == characteristic.uuid) {
@@ -523,30 +497,18 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     private fun addToGraphBuffer(dataChannel: DataChannel, graphAdapter: GraphAdapter?) {
-        if (mFilterData && dataChannel.totalDataPointsReceived > 4* mSampleRate/* && mSampleRate < 1000*/) {
-            val bufferLength = 4 * 250
-            //TODO: Downsample, then filter, then plot:
-            val filterArray = jdownSample(dataChannel.classificationBuffer, mSampleRate)
-            graphAdapter?.setSeriesHistoryDataPoints(bufferLength)
-            val filteredData = jecgBandStopFilter(filterArray)
-            graphAdapter!!.clearPlot()
-
-            for (i in filteredData.indices) { // gA.addDataPointTimeDomain(y,x)
-                graphAdapter.addDataPointTimeDomainAlt(filteredData[i], dataChannel.totalDataPointsReceived - (bufferLength - 1) + i)
-            }
-        } else {
-            if (dataChannel.dataBuffer != null) {
-                var i = 0
-                while (i < dataChannel.dataBuffer!!.size / 2) {
-                    graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble14bit(dataChannel.dataBuffer!![2 * i  + 1],
-                            dataChannel.dataBuffer!![2 * i]),
-                            dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / 2 + i)
-                    i += graphAdapter.sampleRate / 250
-                }
+        if (dataChannel.dataBuffer != null) {
+            var i = 0
+            while (i < dataChannel.dataBuffer!!.size / 2) {
+                graphAdapter!!.addDataPointTimeDomain(DataChannel.bytesToDouble14bit(dataChannel.dataBuffer!![2 * i  + 1],
+                        dataChannel.dataBuffer!![2 * i]),
+                        dataChannel.totalDataPointsReceived - dataChannel.dataBuffer!!.size / 2 + i)
+                i += 1
             }
         }
         dataChannel.resetBuffer()
     }
+
 
 //    private fun addToGraphBufferMPU(dataChannel: DataChannel) {
 //        if (dataChannel.dataBuffer!=null) {

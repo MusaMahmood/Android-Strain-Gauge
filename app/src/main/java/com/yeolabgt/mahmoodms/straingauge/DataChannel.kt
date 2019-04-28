@@ -1,5 +1,6 @@
 package com.yeolabgt.mahmoodms.straingauge
 
+import android.util.Log
 import com.google.common.primitives.Bytes
 
 /**
@@ -59,6 +60,8 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
     }
 
     companion object {
+        private val TAG = DataChannel::class.java.simpleName
+
         private var MSBFirst: Boolean = false
 
         fun bytesToDoubleMPUAccel(a1: Byte, a2: Byte): Double {
@@ -88,7 +91,9 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
 
         fun bytesToDouble14bit(a1: Byte, a2: Byte): Double {
             val unsigned = unsignedBytesToInt(a1, a2, MSBFirst)
-            return unsignedToSigned16bit(unsigned).toDouble() / 16384.0 * 3.30
+            val signed = unsignedToSigned16bit(unsigned).toDouble()
+            Log.e(TAG, "Unsigned: $unsigned, Signed: $signed")
+            return  signed / 8192.0 * 3.30
         }
 
         fun bytesToDouble(a1: Byte, a2: Byte, a3: Byte): Double {
