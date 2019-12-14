@@ -44,7 +44,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     private var mGraphInitializedBoolean = false
     private var mGraphAdapterCh1: GraphAdapter? = null
     private var mTimeDomainPlotAdapterCh1: XYPlotAdapter? = null
-    private var mMotionDataPlotAdapter: XYPlotAdapter? = null
     //Device Information
     private var mBleInitializedBoolean = false
     private lateinit var mBluetoothGattArray: Array<BluetoothGatt?>
@@ -129,12 +128,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         val context = applicationContext
         val uii = FileProvider.getUriForFile(context, context.packageName + ".provider", mPrimarySaveDataFile!!.file)
         files.add(uii)
-        if(mSaveFileMPU!=null) {
-            val uii2 = FileProvider.getUriForFile(context, context.packageName + ".provider", mSaveFileMPU!!.file)
-            files.add(uii2)
-        }
         val exportData = Intent(Intent.ACTION_SEND_MULTIPLE)
-        exportData.putExtra(Intent.EXTRA_SUBJECT, "ECG Sensor Data Export Details")
+        exportData.putExtra(Intent.EXTRA_SUBJECT, "Sodium Sensor Data Export Details")
         exportData.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
         exportData.type = "text/html"
         startActivity(exportData)
@@ -143,7 +138,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     @Throws(IOException::class)
     private fun terminateDataFileWriter() {
         mPrimarySaveDataFile?.terminateDataFileWriter()
-        mSaveFileMPU?.terminateDataFileWriter()
     }
 
     public override fun onResume() {
@@ -201,7 +195,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                 }
                 else -> {
 //                    TODO: Change to 1 or 4 Hz
-                    mSampleRate = 4
+                    mSampleRate = 50
                 }
             }
             Log.e(TAG, "mSampleRate: " + mSampleRate + "Hz")
@@ -212,8 +206,8 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
     }
 
     private fun createNewFile() {
-        val directory = "/ECGData"
-        val fileNameTimeStamped = "ECGData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
+        val directory = "/SodiumSensorData"
+        val fileNameTimeStamped = "SodiumSensorData_" + mTimeStamp + "_" + mSampleRate.toString() + "Hz"
         if (mPrimarySaveDataFile == null) {
             Log.e(TAG, "fileTimeStamp: " + fileNameTimeStamped)
             mPrimarySaveDataFile = SaveDataFile(directory, fileNameTimeStamped,
@@ -224,19 +218,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         }
     }
 
-    private fun createNewFileMPU() {
-        val directory = "/MPUData"
-        val fileNameTimeStamped = "MPUData_" + mTimeStamp
-        if (mSaveFileMPU == null) {
-            Log.e(TAG, "fileTimeStamp: " + fileNameTimeStamped)
-            mSaveFileMPU = SaveDataFile(directory, fileNameTimeStamped,
-                    16, 0.032, true, false)
-        } else if (!mSaveFileMPU!!.initialized) {
-            Log.e(TAG, "New Filename: " + fileNameTimeStamped)
-            mSaveFileMPU?.createNewFile(directory, fileNameTimeStamped)
-        }
-    }
-
     private fun setupGraph() {
         // Initialize our XYPlot reference:
         mGraphAdapterCh1 = GraphAdapter(120, "GSR/SG", false, Color.BLUE) //Color.parseColor("#19B52C") also, RED, BLUE, etc.
@@ -244,8 +225,7 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         mGraphAdapterCh1!!.setPointWidth(5.toFloat())
         mTimeDomainPlotAdapterCh1 = XYPlotAdapter(findViewById(R.id.ecgTimeDomainXYPlot), false, 120, sampleRate = 4)
         mTimeDomainPlotAdapterCh1?.xyPlot?.addSeries(mGraphAdapterCh1!!.series, mGraphAdapterCh1!!.lineAndPointFormatter)
-        mMotionDataPlotAdapter = XYPlotAdapter(findViewById(R.id.motionDataPlot), "Time (s)", "Acc (g)", 375.0)
-        val xyPlotList = listOf(mTimeDomainPlotAdapterCh1?.xyPlot, mMotionDataPlotAdapter?.xyPlot)
+        val xyPlotList = listOf(mTimeDomainPlotAdapterCh1?.xyPlot)
         mRedrawer = Redrawer(xyPlotList, 30f, false)
         mRedrawer!!.start()
         mGraphInitializedBoolean = true
@@ -431,7 +411,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
                     //TODO: INITIALIZE MPU FILE HERE:
                     mMPU = DataChannel(false, true, 0)
 //                    mSaveFileMPU = null
-                    createNewFileMPU()
                 }
             }
             //Run process only once:
@@ -721,7 +700,6 @@ class DeviceControlActivity : Activity(), ActBle.ActBleListener {
         var mSSVEPClass = 0.0
         //Save Data File
         private var mPrimarySaveDataFile: SaveDataFile? = null
-        private var mSaveFileMPU: SaveDataFile? = null
 
         init {
             System.loadLibrary("ecg-lib")

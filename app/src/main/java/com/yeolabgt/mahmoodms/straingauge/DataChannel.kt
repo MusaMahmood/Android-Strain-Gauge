@@ -93,7 +93,7 @@ internal class DataChannel(var chEnabled: Boolean, MSBFirst: Boolean, //Classifi
             val unsigned = unsignedBytesToInt(a1, a2, MSBFirst)
             val signed = unsignedToSigned16bit(unsigned).toDouble()
             Log.e(TAG, "Unsigned: $unsigned, Signed: $signed")
-            return  signed / 8192.0 * 3.30
+            return  signed / 16384.0 * 3.30
         }
 
         fun bytesToDouble(a1: Byte, a2: Byte, a3: Byte): Double {
